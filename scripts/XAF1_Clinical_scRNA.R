@@ -32,6 +32,8 @@ path_full <- "/home/Toshiba1/Lab_Ma/yuanyi/XAF1-clinical-association/"
 
 sce1 <- readRDS(paste(path_full, "data/IAV_and_COVID-19_data/GSE271284/230217_recast_after_qc.rds", sep = ""))
 head(sce1@meta.data)
+table(sce1$Patient.Id[which(sce1$condition_unified == "healthy adult")])
+
 DefaultAssay(sce1) <- "RNA"
 
 p1 <- CellDimPlot(
@@ -341,8 +343,39 @@ res_all <- merge(res_all, kegg_df$TERM2NAME, by.x = "pathway", by.y = "Term", al
 # 9) 导出结果表
 write.csv(res_all, file = "XAF1_pathway_spearman_by_celltype.csv", row.names = FALSE)
 
-res_all <- read.csv("/home/Toshiba1/Lab_Ma/yuanyi/XAF1-clinical-association/results/COVID-19_scRNA/XAF1_pathway_spearman_by_celltype.csv",header = TRUE)
+res_all <- read.csv("/home/Toshiba1/Lab_Ma/yuanyi/XAF1-clinical-association/results/COVID-19_scRNA/XAF1_pathway_spearman_by_celltype.csv", header = TRUE)
 
+# 统计每个细胞类型中显著相关的pathway数量
+res_count <- res_all %>%
+    filter(adj.p < 0.05) %>%
+    group_by(celltype) %>%
+    summarise(sig_pathway_count = n_distinct(Name)) %>%
+    arrange(desc(sig_pathway_count))
+
+# 绘制条形图
+p1 <- ggplot(res_count, aes(
+    x = reorder(celltype, -sig_pathway_count),
+    y = sig_pathway_count, fill = celltype
+)) +
+    geom_col(width = 0.6) +
+    geom_text(aes(label = sig_pathway_count), vjust = -0.3, size = 4) +
+    scale_fill_brewer(palette = "Set2") +
+    labs(
+        x = "", y = "Number of significant pathways",
+        title = "Significant pathways correlated with XAF1"
+    ) +
+    theme_bw(base_size = 13) +
+    theme(
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5, face = "bold")
+    )
+p1
+
+pdf("XAF1_pathway_sig_count_by_celltype.pdf", width = 6, height = 4)
+print(p1)
+dev.off()
+
+head(res_all)
 # 10) 判断细胞类型特异性 —— 两类方法（A）基于显著性交叉比较（显著/非显著分布）
 # 简单筛选：在某细胞类型 q < 0.05 且在其它类型 q >= 0.05 -> 细胞类型特异性
 res_sig <- res_all %>%
@@ -354,8 +387,138 @@ res_sig <- res_all %>%
         .groups = "drop"
     ) %>%
     arrange(desc(n_sig))
+
+# 提取4个细胞类型都显著的pathway
+common_sig <- res_sig %>% filter(n_sig == 4)
+
+res_plot <- res_all %>%
+    filter(Name %in% common_sig$Name)
+
+# 12) 可视化：取 top N 显著相关的 pathway（按任一 celltype q）
+topN2 <- 30
+# 选基于任一 celltype 最小 q 排序
+path_order2 <- res_plot %>%
+    group_by(Name) %>%
+    summarise(min_q = min(adj.p, na.rm = TRUE)) %>%
+    arrange(min_q) %>%
+    pull(Name)
+top_paths <- head(path_order2, topN2)
+
+res_plot <- res_all %>% filter(Name %in% top_paths)
+
+# 绘制热图
+p2 <- ggplot() +
+    geom_tile(
+        data = res_plot,
+        aes(x = celltype, y = Name),
+        fill = "#d9d9d9", color = "white", width = 0.65, height = 0.65
+    ) +
+    geom_tile(
+        data = res_plot %>% filter(adj.p < 0.05),
+        aes(x = celltype, y = Name, fill = rho),
+        color = NA, width = 0.65, height = 0.65
+    ) +
+    geom_star(
+        data = res_plot %>% filter(adj.p < 0.05),
+        aes(x = celltype, y = Name),
+        size = 1.5, fill = "#d7301f", color = "#d7301f"
+    ) +
+    scale_fill_gradient2(
+        low = "#2166AC", mid = "white", high = "#D6604D", midpoint = 0,
+        name = expression(rho ~ "(XAF1 & pathway activity)")
+    ) +
+    scale_x_discrete(position = "top") +
+    labs(x = "", y = "") +
+    coord_equal(clip = "off") +
+    theme_bw() +
+    theme(
+        panel.border = element_blank(),
+        panel.grid = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text.y = element_text(face = "bold", color = "black", size = 10),
+        axis.text.x = element_text(
+            face = "bold", color = "black", size = 10,
+            angle = 45, hjust = 0
+        ),
+        legend.background = element_rect(color = "#737373")
+    ) +
+    plot_annotation(
+        title = paste("Top30 Common significant pathways (in all 4 cell types)", sep = ""),
+        theme = theme(
+            plot.title = element_text(
+                size = 16, face = "bold", hjust = 0.5,
+                margin = margin(b = 10)
+            ),
+            plot.margin = margin(20, 20, 20, 20)
+        )
+    )
+
+p2
+pdf("XAF1_common_pathway_corr_heatmap_top30.pdf", width = 8, height = 9)
+print(p2)
+dev.off()
+
 # pathways where n_sig ==1 are potentially cell-type-specific
-pathways_ct_specific <- res_sig %>% filter(n_sig <= 3)
+pathways_ct_specific <- res_sig %>%
+    filter(n_sig <= 3) |>
+    arrange(n_sig)
+
+res_specific_plot <- res_all %>%
+    filter(Name %in% pathways_ct_specific$Name) |>
+    mutate(Name = factor(Name, levels = rev(pathways_ct_specific$Name)))
+
+# 绘制气泡图：x为细胞类型，y为pathway，气泡大小为|rho|，颜色为rho方向
+p3 <- ggplot() +
+    geom_tile(
+        data = res_specific_plot,
+        aes(x = celltype, y = Name),
+        fill = "#d9d9d9", color = "white", width = 0.65, height = 0.65
+    ) +
+    geom_tile(
+        data = res_specific_plot %>% filter(adj.p < 0.05),
+        aes(x = celltype, y = Name, fill = rho),
+        color = NA, width = 0.65, height = 0.65
+    ) +
+    geom_star(
+        data = res_specific_plot %>% filter(adj.p < 0.05),
+        aes(x = celltype, y = Name),
+        size = 1.5, fill = "#d7301f", color = "#d7301f"
+    ) +
+    scale_fill_gradient2(
+        low = "#2166AC", mid = "white", high = "#D6604D", midpoint = 0,
+        name = expression(rho ~ "(XAF1 & pathway activity)")
+    ) +
+    scale_x_discrete(position = "top") +
+    labs(x = "", y = "") +
+    coord_equal(clip = "off") +
+    theme_bw() +
+    theme(
+        panel.border = element_blank(),
+        panel.grid = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text.y = element_text(face = "bold", color = "black", size = 10),
+        axis.text.x = element_text(
+            face = "bold", color = "black", size = 10,
+            angle = 45, hjust = 0
+        ),
+        legend.background = element_rect(color = "#737373")
+    ) +
+    plot_annotation(
+        title = paste("Cell-type-specific or partially shared pathways", sep = ""),
+        theme = theme(
+            plot.title = element_text(
+                size = 16, face = "bold", hjust = 0.5,
+                margin = margin(b = 10)
+            ),
+            plot.margin = margin(20, 20, 20, 20)
+        )
+    )
+
+p3
+
+pdf("XAF1_ct_specific_pathway_corr_heatmap.pdf", width = 10, height = 15)
+print(p3)
+dev.off()
 
 # 11) 更严格的比较：两两比较相关系数差异（Fisher z）
 # 函数：比较两组 rho 的差异
@@ -460,6 +623,7 @@ dev.off()
 
 
 
+
 ### 切换 plot_star_cloud 环境 ####
 
 df_all <- readRDS("df_for_cluster_umap.rds")
@@ -537,98 +701,12 @@ for (i in levels(df_all$population)) {
             )
         )
     pdf(paste(i, "COVID19_Major_Immune_Cell_Types_UMAP.pdf"), width = 10, height = 10)
-    print(p)
+    print(p1)
     dev.off()
+}
 
-    # ----------------- 新增：基于 res_all 的汇总与可视化 -----------------
-    # 1) 每个细胞类型中，与 XAF1 显著相关的 pathway 数量（adj.p < 0.05）
-    sig_res <- res_all %>% filter(!is.na(adj.p) & adj.p < 0.05)
+### all plot #####
 
-    counts_df <- sig_res %>% group_by(celltype) %>% summarise(n_sig = n()) %>% arrange(desc(n_sig))
-
-    if (nrow(counts_df) > 0) {
-        p_counts <- ggplot(counts_df, aes(x = reorder(celltype, -n_sig), y = n_sig)) +
-            geom_col(fill = "#2b83ba") +
-            geom_text(aes(label = n_sig), vjust = -0.3, size = 3.5) +
-            labs(x = "Cell type", y = "Number of significant pathways (adj.p < 0.05)", title = "XAF1-significant KEGG pathways by cell type") +
-            theme_bw() +
-            theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-        pdf("XAF1_sig_pathway_counts_by_celltype.pdf", width = 6, height = 4)
-        print(p_counts)
-        dev.off()
-    } else {
-        message("No significant pathways (adj.p < 0.05) found in res_all -- skipping counts plot.")
-    }
-
-    # 2) 四个细胞类型共同显著相关的 pathway（在所有 major_cts 中均 adj.p < 0.05）
-    # 确保 major_cts 变量可用（脚本前面已定义），否则使用独立计算的前四类
-    if (!exists("major_cts")) {
-        major_cts <- unique(res_all$celltype)[1:4]
-    }
-
-    shared_names <- sig_res %>% filter(celltype %in% major_cts) %>% group_by(Name) %>% summarise(n_ct = n_distinct(celltype)) %>% filter(n_ct == length(major_cts)) %>% pull(Name)
-
-    if (length(shared_names) > 0) {
-        mat_shared <- res_all %>% filter(Name %in% shared_names & celltype %in% major_cts) %>% select(Name, celltype, rho) %>% tidyr::pivot_wider(names_from = celltype, values_from = rho)
-        matm <- as.data.frame(mat_shared)
-        rownames(matm) <- matm$Name
-        matm$Name <- NULL
-        matm_mat <- as.matrix(matm)
-
-        # order pathways by mean rho
-        ord <- order(rowMeans(matm_mat, na.rm = TRUE), decreasing = TRUE)
-        matm_mat <- matm_mat[ord, , drop = FALSE]
-
-        if (nrow(matm_mat) > 0) {
-            pdf("XAF1_shared_pathways_heatmap_all4.pdf", width = 6 + 0.4 * nrow(matm_mat), height = 6 + 0.15 * nrow(matm_mat))
-            pheatmap::pheatmap(matm_mat,
-                color = colorRampPalette(c("#2166AC", "white", "#D6604D"))(50),
-                cluster_rows = TRUE, cluster_cols = FALSE, show_rownames = TRUE, show_colnames = TRUE,
-                main = paste0("Pathways significant in all ", length(major_cts), " major cell types"),
-                fontsize_row = 8
-            )
-            dev.off()
-        }
-    } else {
-        message("No pathways are significant across all major cell types.")
-    }
-
-    # 3) 非全部共同显著（partial / cell-type-specific）pathways：dotplot（color = rho, size = -log10(adj.p) ）
-    noncommon_tbl <- sig_res %>% filter(celltype %in% major_cts) %>% group_by(Name) %>% summarise(n_ct = n_distinct(celltype), min_q = min(adj.p, na.rm = TRUE)) %>% filter(n_ct < length(major_cts)) %>% arrange(n_ct, min_q)
-    noncommon_names <- noncommon_tbl$Name
-
-    if (length(noncommon_names) > 0) {
-        topN_noncommon <- 40
-        top_noncommon <- head(noncommon_names, topN_noncommon)
-
-        df_dot <- res_all %>% filter(Name %in% top_noncommon & celltype %in% major_cts) %>%
-            mutate(adj.p = as.numeric(adj.p)) %>%
-            mutate(size_val = ifelse(!is.na(adj.p) & adj.p > 0, pmin(-log10(adj.p), 50), 0),
-                   sig_flag = ifelse(!is.na(adj.p) & adj.p < 0.05, TRUE, FALSE))
-
-        # keep order of pathways by number of cell types (more specific first)
-        pathway_order <- noncommon_tbl %>% filter(Name %in% top_noncommon) %>% arrange(n_ct, min_q) %>% pull(Name)
-
-        p_dot <- ggplot(df_dot, aes(x = celltype, y = factor(Name, levels = rev(pathway_order)))) +
-            geom_point(aes(size = size_val, color = rho, alpha = sig_flag)) +
-            scale_color_gradient2(low = "#2166AC", mid = "white", high = "#D6604D", midpoint = 0, na.value = "grey80") +
-            scale_size_continuous(range = c(0.5, 6), name = expression(-log[10](adj.p))) +
-            scale_alpha_manual(values = c(`TRUE` = 1, `FALSE` = 0.25), guide = FALSE) +
-            labs(x = "Cell type", y = "Pathway (non-shared significant)", title = paste0("Top ", length(pathway_order), " pathways significant in subset of cell types")) +
-            theme_bw() +
-            theme(axis.text.y = element_text(size = 8), axis.text.x = element_text(angle = 45, hjust = 1))
-
-        pdf("XAF1_noncommon_pathways_dotplot_top40.pdf", width = 8, height = max(4, 0.2 * length(pathway_order)))
-        print(p_dot)
-        dev.off()
-    } else {
-        message("No partially-shared significant pathways to plot (all significant pathways are either unique or shared by all).")
-    }
-
-    # ----------------- 新增结束 -----------------
-
-    ### 切换 plot_star_cloud 环境 ####
 p <- ggplot(
     df_all,
     aes(x = dim1, y = dim2)

@@ -1216,7 +1216,7 @@ all.score.df <- all.score.df %>%
     mutate(
         p.adj = p.adjust(p.value, method = "BH"),
         signif = case_when(
-            !is.na(p.adj) & p.adj < 0.05 ~ "*",
+            !is.na(p.adj) & p.adj < 0.05 ~ "adj.p < 0.05",
             TRUE ~ ""
         ),
         # 构建纵轴标签：probe + thresholds（根据偏好可改顺序）
@@ -1224,33 +1224,52 @@ all.score.df <- all.score.df %>%
     )
 
 library(ggplot2)
-
+library(readr)
 
 probe_order <- sort(unique(all.score.df$probe)) # 或自定义排序
 
 all.score.df$probe <- factor(all.score.df$probe,
     levels = probe_order
 )
+
+filter_probe <- c("cg13823366", "cg10381036", "cg17753212")
+
+all.score.df2 <- all.score.df %>%
+    filter(!probe %in% filter_probe)
+
+
+rho_tb <- read_delim("/home/Toshiba1/Lab_Ma/yuanyi/XAF1-clinical-association/results/methylation/XAF1_probe_expression_correlation.tsv", delim = "\t", col_names = TRUE, show_col_types = FALSE)
+rho_tb[1:5, 1:18]
+
+all.score.df2 <- all.score.df2 %>%
+    left_join(
+        rho_tb %>%
+            select(probe, cancer, rho, p_value) %>%
+            dplyr::rename(rho.p.value = p_value),
+        by = c("probe", "cancer")
+    )
+all.score.df2[1:5, 1:12]
+
 library(ggstar)
 p <- ggplot() +
     geom_tile(
-        data = all.score.df,
+        data = all.score.df2,
         aes(x = cancer, y = probe),
         fill = "#d9d9d9", color = "white", width = 0.65, height = 0.65
     ) +
     geom_tile(
-        data = all.score.df %>% filter(!is.na(cliff.delta) & p.adj < 0.05),
+        data = all.score.df2 %>% filter(!is.na(cliff.delta) & p.adj < 0.05),
         aes(x = cancer, y = probe, fill = cliff.delta),
         color = NA, width = 0.65, height = 0.65
     ) +
     geom_star(
-        data = all.score.df %>% na.omit() %>% dplyr::filter(p.adj < 0.05),
+        data = all.score.df2 %>% na.omit() %>% dplyr::filter(p.adj < 0.05),
         aes(x = cancer, y = probe, starshape = signif),
         size = 2, fill = "#d7301f", color = "#d7301f"
     ) +
     scale_fill_gradient2(
         low = "#984EA3", mid = "white", high = "#FF7F00", midpoint = 0,
-        name = bquote(~Cliff ~ "'" ~ s ~ " Delta")
+        name = bquote(~Cliff ~ "'" ~ s ~ " Delta" ~ " (" ~ mythe^high / ~ mythe^low ~ ")")
     ) +
     scale_x_discrete(position = "top") +
     labs(x = "", y = "") +
@@ -1266,8 +1285,175 @@ p <- ggplot() +
     )
 
 print(p)
-setwd("/home/Toshiba1/Lab_Ma/yuanyi/XAF1-clinical-association/results/methylation/easier")
 
-pdf("1.all XAF1 methylation probe easier score.pdf", height = 6, width = 8)
+pdf("/home/Toshiba1/Lab_Ma/yuanyi/XAF1-clinical-association/results/methylation/easier/1.all XAF1 methylation probe easier score.pdf", height = 6, width = 10)
+print(p)
+dev.off()
+
+
+library(ggplot2)
+library(dplyr)
+library(ggnewscale)
+
+# 模拟数据
+set.seed(1)
+df <- all.score.df2
+
+# 构造两个半格：上右半（cliff.delta）和下左半（rho）
+half_tile <- function(data, side = "upper") {
+    if (side == "upper") {
+        data %>%
+            mutate(
+                x1 = as.numeric(factor(cancer)) - 0.5,
+                x2 = as.numeric(factor(cancer)) + 0.5,
+                y1 = as.numeric(factor(probe)) - 0.5,
+                y2 = as.numeric(factor(probe)) + 0.5
+            ) %>%
+            rowwise() %>%
+            mutate(coords = list(data.frame(
+                x = c(x1, x2, x2),
+                y = c(y2, y2, y1)
+            ))) %>%
+            unnest(coords)
+    } else {
+        data %>%
+            mutate(
+                x1 = as.numeric(factor(cancer)) - 0.5,
+                x2 = as.numeric(factor(cancer)) + 0.5,
+                y1 = as.numeric(factor(probe)) - 0.5,
+                y2 = as.numeric(factor(probe)) + 0.5
+            ) %>%
+            rowwise() %>%
+            mutate(coords = list(data.frame(
+                x = c(x1, x1, x2),
+                y = c(y1, y2, y1)
+            ))) %>%
+            unnest(coords)
+    }
+}
+
+# 上右半：cliff.delta
+upper <- half_tile(df, "upper") %>% mutate(value = cliff.delta, type = "Cliff Delta")
+
+# 下左半：rho
+lower <- half_tile(df, "lower") %>% mutate(value = rho, type = "rho")
+
+# 合并
+df_plot <- bind_rows(upper, lower) |>
+    as.data.frame()
+
+head(df_plot)
+
+df_plot$value[which(df_plot$p.adj >= 0.05 & df_plot$type == "Cliff Delta")] <- NA
+df_plot$value[which(df_plot$rho.p.value >= 0.05 & df_plot$type == "rho")] <- NA
+
+center_df <- df_plot %>%
+    distinct(cancer, probe, cliff.delta, rho, p.adj, rho.p.value, type) %>%
+    mutate(
+        x_center = as.numeric(factor(cancer)),
+        y_center = as.numeric(factor(probe))
+    )
+head(center_df)
+
+center_df <- center_df %>%
+    mutate(
+        signif = case_when(
+            type == "Cliff Delta" & p.adj < 0.05 ~ "adj.p < 0.05",
+            type == "rho" & rho.p.value < 0.05 ~ "adj.p < 0.05",
+            TRUE ~ ""
+        )
+    )
+
+# 绘图
+
+library(ggplot2)
+library(ggnewscale)
+library(dplyr)
+library(ggstar)
+library(cowplot)
+
+p <- ggplot() +
+    # --- 第一层：Cliff Delta ---
+    geom_polygon(
+        data = df_plot %>% filter(type == "Cliff Delta"),
+        aes(x = x, y = y, group = interaction(cancer, probe, type), fill = value),
+        color = "white", size = 0.2
+    ) +
+    scale_fill_gradient2(
+        low = "#984EA3", mid = "white", high = "#FF7F00", midpoint = 0,
+        na.value = "#F0F0F0",
+        name = bquote(~Cliff ~ "'" ~ s ~ " Delta" ~ " (" ~ mythe^high / ~ mythe^low ~ ")"),
+        guide = guide_colorbar( # 🎯 独立设置 Cliff Delta 图例样式
+            barwidth = 8,
+            barheight = 0.6,
+            title.position = "top",
+            title.hjust = 0.5,
+            title.theme = element_text(size = 9),
+            label.theme = element_text(size = 8)
+        )
+    ) +
+    new_scale_fill() + # 🔄 重置 fill，为 rho 启动新的颜色映射
+
+    # --- 第二层：rho ---
+    geom_polygon(
+        data = df_plot %>% filter(type == "rho"),
+        aes(x = x, y = y, group = interaction(cancer, probe, type), fill = value),
+        color = "white", size = 0.2
+    ) +
+    scale_fill_gradient2(
+        low = "#2166AC", mid = "white", high = "#D6604D", midpoint = 0,
+        na.value = "#F0F0F0",
+        name = bquote(~rho ~ " (" ~ mythe / ~RNA ~ ")"),
+        guide = guide_colorbar( # 🎯 独立设置 rho 图例样式
+            barwidth = 4,
+            barheight = 0.6,
+            title.position = "top",
+            title.hjust = 0.5,
+            title.theme = element_text(size = 9),
+            label.theme = element_text(size = 8)
+        )
+    ) +
+
+    # --- 星号标记 ---
+    geom_star(
+        data = center_df %>% filter(p.adj < 0.05),
+        aes(x = x_center + 0.2, y = y_center + 0.2),
+        size = 2, color = "#D6604D", fill = "#D6604D"
+    ) +
+    geom_star(
+        data = center_df %>% filter(rho.p.value < 0.05),
+        aes(x = x_center - 0.2, y = y_center - 0.2),
+        size = 2, color = "#2166AC", fill = "#2166AC"
+    ) +
+
+    # --- 坐标和主题 ---
+    scale_x_continuous(
+        breaks = 1:length(unique(df_plot$cancer)),
+        labels = unique(df_plot$cancer),
+        position = "top",
+        expand = c(0, 0)
+    ) +
+    scale_y_continuous(
+        breaks = 1:length(unique(df_plot$probe)),
+        labels = unique(df_plot$probe),
+        expand = c(0, 0)
+    ) +
+    coord_equal(clip = "off") +
+    theme_bw() +
+    theme(
+        axis.title = element_blank(),
+        panel.border = element_blank(),
+        panel.grid = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text.y = element_text(face = "bold", color = "black", size = 15),
+        axis.text.x = element_text(face = "bold", color = "black", size = 15, angle = 45, hjust = 0),
+        legend.position = "bottom",
+        legend.box = "horizontal",
+        legend.spacing.x = unit(1, "cm") # 两个 legend 之间加点间距
+    )
+
+print(p)
+
+pdf("/home/Toshiba1/Lab_Ma/yuanyi/XAF1-clinical-association/results/methylation/easier/2.all XAF1 methylation probe easier score and expression correlation.pdf", height = 7, width = 15)
 print(p)
 dev.off()
