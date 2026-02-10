@@ -1332,6 +1332,14 @@ dev.off()
 gset3 <- getGEO("GSE101702", GSEMatrix = TRUE, getGPL = FALSE, destdir = "./GSE101702/", AnnotGPL = F)
 
 ex3 <- exprs(gset3[[1]])
+
+qx <- quantile(ex3, c(0, 0.25, 0.5, 0.75, 0.99, 1))
+LogC <- (qx[5] > 100) || (qx[6] - qx[1] > 50 && qx[2] > 0)
+if (LogC) {
+  ex3[ex3 <= 0] <- NA
+  ex3 <- log2(ex3 + 1)
+}
+
 ex3 <- normalizeBetweenArrays(ex3)
 boxplot(ex3, outline = FALSE, notch = T, col = factor(meta1$geo_accession), las = 2) ## 查看表达水平
 
@@ -1403,7 +1411,16 @@ head(data3)
 gset4 <- getGEO("GSE111368", GSEMatrix = TRUE, getGPL = FALSE, destdir = "./GSE111368/", AnnotGPL = F)
 
 ex4 <- exprs(gset4[[1]])
+
+qx <- quantile(ex4, c(0, 0.25, 0.5, 0.75, 0.99, 1))
+LogC <- (qx[5] > 100) || (qx[6] - qx[1] > 50 && qx[2] > 0)
+if (LogC) {
+  ex4[ex4 <= 0] <- NA
+  ex4 <- log2(ex4 + 1)
+}
+
 ex4 <- normalizeBetweenArrays(ex4)
+
 
 index <- gset4[[1]]@annotation
 
@@ -1529,6 +1546,14 @@ head(data6)
 gset7 <- getGEO("GSE51808", GSEMatrix = TRUE, getGPL = FALSE, destdir = "./GSE51808/", AnnotGPL = F)
 
 ex7 <- exprs(gset7[[1]])
+
+qx <- quantile(ex7, c(0, 0.25, 0.5, 0.75, 0.99, 1))
+LogC <- (qx[5] > 100) || (qx[6] - qx[1] > 50 && qx[2] > 0)
+if (LogC) {
+  ex7[ex7 <= 0] <- NA
+  ex7 <- log2(ex7 + 1)
+}
+
 ex7 <- normalizeBetweenArrays(ex7)
 
 ex7[1:5, 1:5]
@@ -1604,7 +1629,14 @@ data7 <- data7 |>
 gset10 <- getGEO("GSE105450", GSEMatrix = TRUE, getGPL = FALSE, destdir = "./GSE105450/", AnnotGPL = F)
 
 ex10 <- exprs(gset10[[1]])
-ex10 <- normalizeBetweenArrays(ex10)
+
+qx <- quantile(ex10, c(0, 0.25, 0.5, 0.75, 0.99, 1))
+LogC <- (qx[5] > 100) || (qx[6] - qx[1] > 50 && qx[2] > 0)
+if (LogC) {
+  ex10[ex10 <= 0] <- NA
+  ex10 <- log2(ex10 + 1)
+}
+
 ex10[1:5, 1:5]
 
 index <- gset10[[1]]@annotation
@@ -1643,6 +1675,8 @@ table(meta10$severity)
 
 exp10_max <- exp10_max[, meta10$geo_accession]
 exp10_max[1:5, 1:5]
+
+exp10_max[is.na(exp10_max)] <- 0
 
 data10 <- data.frame(
   exp = unlist(exp10_max["XAF1", meta10$geo_accession, drop = T]),
@@ -1767,7 +1801,14 @@ head(data8)
 gset11 <- getGEO("GSE69606", GSEMatrix = TRUE, getGPL = FALSE, destdir = "./GSE69606/", AnnotGPL = F)
 
 ex11 <- exprs(gset11[[1]])
-ex11 <- normalizeBetweenArrays(ex11)
+
+qx <- quantile(ex11, c(0, 0.25, 0.5, 0.75, 0.99, 1))
+LogC <- (qx[5] > 100) || (qx[6] - qx[1] > 50 && qx[2] > 0)
+if (LogC) {
+  ex11[ex11 <= 0] <- NA
+  ex11 <- log2(ex11 + 1)
+}
+
 ex11[1:5, 1:5]
 
 index <- gset11[[1]]@annotation
@@ -1800,6 +1841,8 @@ meta11$`disease:ch1`[which(meta11$`acute or recovery:ch1` == "recovery")] <- "Re
 
 exp11_max <- exp11_max[, meta11$geo_accession]
 exp11_max[1:5, 1:5]
+
+exp11_max[is.na(exp11_max)] <- 0
 
 data11 <- data.frame(
   exp = unlist(exp11_max["XAF1", meta11$geo_accession, drop = T]),
@@ -1836,7 +1879,6 @@ data11 <- data11 |>
 head(data3)
 table(data10$Group)
 
-setwd("/home/Toshiba1/Lab_Ma/yuanyi/XAF1-clinical-association/results/IAV_and_COVID-19/")
 plot_list <- list(data3, data4, data6, data7, data10, data9, data8, data11)
 
 for (i in 1:8) {
