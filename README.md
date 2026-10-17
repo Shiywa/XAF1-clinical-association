@@ -60,7 +60,7 @@ provide a repository-relative default under `data/` when practical.
 The complete input/output map is in
 [`docs/FIGURE_SCRIPT_MAP.tsv`](docs/FIGURE_SCRIPT_MAP.tsv).
 
-## Important scope decisions
+## Analysis notes
 
 - The reorganized Fig. 2h pipeline queries the NCBI Datasets mammalian
   orthologue set, chooses one protein per non-human taxon, applies alignment
@@ -68,9 +68,7 @@ The complete input/output map is in
   and projects them to human XAF1 coordinates. The current analysis retained
   220 non-human mammalian orthologues; the count is written from the run data
   and may change when NCBI records are updated.
-- All pan-cancer analyses use the same 19 cancer types. OV is excluded from
-  Fig. 7e-f and ED Fig. 8c, including both methylation and expression/EaSIeR
-  calculations.
+- All pan-cancer analyses use the same predefined 19-cancer collection.
 - ED Fig. 7k displays cell-level distributions but exports donor-level summary
   values and Wilcoxon tests so cells from one donor are not counted as
   independent biological replicates.

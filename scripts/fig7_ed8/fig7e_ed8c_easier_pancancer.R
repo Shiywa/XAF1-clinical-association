@@ -21,7 +21,7 @@ pan_cancer_set <- c(
     "BLCA", "BRCA", "CESC", "GBM", "HNSC", "KIRC", "KIRP", "LIHC", "LUAD",
     "LUSC", "PAAD", "PRAD", "SKCM", "STAD", "THCA", "UCEC", "COAD", "READ", "ESCA"
 )
-stopifnot(length(pan_cancer_set) == 19L, !"OV" %in% pan_cancer_set)
+stopifnot(length(pan_cancer_set) == 19L, length(unique(pan_cancer_set)) == 19L)
 
 # 3. 预测 ICB 响应可能性
 predict_immune_response2 <- function(pathways = NULL, immunecells = NULL, tfs = NULL, lrpairs = NULL,
