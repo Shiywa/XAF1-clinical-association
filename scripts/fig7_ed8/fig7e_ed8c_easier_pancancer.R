@@ -1,11 +1,27 @@
-########## easier analysis #####
+#!/usr/bin/env Rscript
+
+# Fig. 7e and Extended Data Fig. 8c: pan-cancer XAF1-stratified
+# transcriptomic immune features and EaSIeR-predicted ICB response scores.
 
 library(easier)
 library(biomaRt)
 library(readr)
 library(dplyr)
 
-setwd("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier")
+project_root <- Sys.getenv("XAF1_PROJECT_ROOT", unset = getwd())
+source(file.path(project_root, "scripts", "common", "config.R"))
+easier_root <- xaf1_env_path("XAF1_EASIER_ROOT", must_exist = TRUE)
+gdc_root <- xaf1_env_path("XAF1_GDC_ROOT", must_exist = TRUE)
+output_dir <- xaf1_output_dir("fig7_ed8", "easier")
+all_easier_dir <- file.path(output_dir, "per_cancer")
+dir.create(all_easier_dir, recursive = TRUE, showWarnings = FALSE)
+setwd(output_dir)
+
+pan_cancer_set <- c(
+    "BLCA", "BRCA", "CESC", "GBM", "HNSC", "KIRC", "KIRP", "LIHC", "LUAD",
+    "LUSC", "PAAD", "PRAD", "SKCM", "STAD", "THCA", "UCEC", "COAD", "READ", "ESCA"
+)
+stopifnot(length(pan_cancer_set) == 19L, !"OV" %in% pan_cancer_set)
 
 # 3. 预测 ICB 响应可能性
 predict_immune_response2 <- function(pathways = NULL, immunecells = NULL, tfs = NULL, lrpairs = NULL,
@@ -16,7 +32,7 @@ predict_immune_response2 <- function(pathways = NULL, immunecells = NULL, tfs = 
     available_cancer_types <- c(
         "BLCA", "BRCA", "CESC", "CRC",
         "GBM", "HNSC", "KIRC", "KIRP", "LIHC", "LUAD", "LUSC",
-        "NSCLC", "OV", "PAAD", "PRAD", "SKCM", "STAD", "THCA",
+        "NSCLC", "PAAD", "PRAD", "SKCM", "STAD", "THCA",
         "UCEC"
     )
     if (!cancer_type %in% available_cancer_types) {
@@ -42,8 +58,8 @@ predict_immune_response2 <- function(pathways = NULL, immunecells = NULL, tfs = 
         return(tmp)
     })
     view_combinations <- view_simples
-    opt_models <- readRDS("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier/opt_models.rds")
-    opt_xtrain_stats <- readRDS("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier/opt_xtrain_stats.rds")
+    opt_models <- readRDS(file.path(easier_root, "opt_models.rds"))
+    opt_xtrain_stats <- readRDS(file.path(easier_root, "opt_xtrain_stats.rds"))
     compute_prediction <- function(view, verbose, opt_models,
                                    opt_xtrain_stats, cancer_type) {
         view_info <- view_combinations[[view]]
@@ -211,19 +227,17 @@ rmtlr_test <- function(x_test,
 }
 
 ###### for CRC ##############
-setwd("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier/all_easier/")
+setwd(all_easier_dir)
 library(tibble)
 
-cancer_use <- c("BLCA", "BRCA", "CESC", "GBM", "HNSC", "KIRC", "KIRP", "LIHC", "LUAD", "LUSC", "OV", "PAAD", "PRAD", "SKCM", "STAD", "THCA", "UCEC")
-
-hub <- AnnotationHub(localHub = TRUE)
+cancer_use <- setdiff(pan_cancer_set, c("COAD", "READ", "ESCA"))
 
 for (i in c("COAD", "READ")) {
-    setwd("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier/all_easier")
-    dir.create(i)
+    setwd(all_easier_dir)
+    dir.create(i, recursive = TRUE, showWarnings = FALSE)
     setwd(i)
 
-    file_path <- paste("~/biosoft/GDC_TCGA_20250630_STAR_count/", i, sep = "")
+    file_path <- file.path(gdc_root, i)
 
     all_file <- list.files(file_path, full.names = T)
     tpm_file <- all_file[grep("Symbol_tpm.tsv", all_file)]
@@ -375,12 +389,12 @@ for (i in c("COAD", "READ")) {
 
 ##### for all other cancer #######
 
-for (i in cancer_use[7]) {
-    setwd("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier/all_easier")
-    dir.create(i)
+for (i in cancer_use) {
+    setwd(all_easier_dir)
+    dir.create(i, recursive = TRUE, showWarnings = FALSE)
     setwd(i)
 
-    file_path <- paste("~/biosoft/GDC_TCGA_20250630_STAR_count/", i, sep = "")
+    file_path <- file.path(gdc_root, i)
 
     all_file <- list.files(file_path, full.names = T)
     tpm_file <- all_file[grep("Symbol_tpm.tsv", all_file)]
@@ -530,14 +544,14 @@ for (i in cancer_use[7]) {
 
 ##### add ESCA 等肿瘤类型 #####
 
-cancer_use <- c("ESCA")
+cancer_use <- intersect("ESCA", pan_cancer_set)
 
 for (i in cancer_use) {
-    setwd("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier/all_easier")
-    dir.create(i)
+    setwd(all_easier_dir)
+    dir.create(i, recursive = TRUE, showWarnings = FALSE)
     setwd(i)
 
-    file_path <- paste("~/biosoft/GDC_TCGA_20250630_STAR_count/", i, sep = "")
+    file_path <- file.path(gdc_root, i)
 
     all_file <- list.files(file_path, full.names = T)
     tpm_file <- all_file[grep("Symbol_tpm.tsv", all_file)]
@@ -689,15 +703,28 @@ for (i in cancer_use) {
 ###### 整合所有的easier结果 ####
 library(rstatix)
 library(ggpubr)
-setwd("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier")
+setwd(output_dir)
 
-all.score <- list.files("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier/all_easier/", recursive = T, pattern = "easier_score", full.names = T)
-all.cancer <- list.files("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier/all_easier/")
+keep_pan_cancer_files <- function(paths) {
+    paths[basename(dirname(paths)) %in% pan_cancer_set]
+}
+
+validate_pan_cancer_files <- function(paths, label) {
+    paths <- keep_pan_cancer_files(paths)
+    cancers <- basename(dirname(paths))
+    if (length(paths) != 19L || !setequal(cancers, pan_cancer_set)) {
+        stop(label, " files do not match the required 19-cancer set.")
+    }
+    paths
+}
+
+all.score <- list.files(all_easier_dir, recursive = TRUE, pattern = "easier_score", full.names = TRUE) |>
+    validate_pan_cancer_files("EaSIeR score")
 
 score.list <- list()
 for (i in seq(all.score)) {
     d1 <- read.table(all.score[i], header = T, sep = "\t")
-    d1$cancer <- all.cancer[i]
+    d1$cancer <- basename(dirname(all.score[i]))
     score.list[[i]] <- d1
 }
 all.df.score <- do.call(rbind, score.list)
@@ -740,10 +767,14 @@ pdf("4.all easier.pdf", height = 8, width = 12)
 print(p1)
 dev.off()
 
-all.pathway <- list.files("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier/all_easier/", recursive = T, pattern = "pathway_activities", full.names = T)
-all.tf_activity <- list.files("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier/all_easier/", recursive = T, pattern = "tf_activities", full.names = T)
-all.LR_weight <- list.files("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier/all_easier/", recursive = T, pattern = "lrpair_weights", full.names = T)
-all.cell_fraction <- list.files("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier/all_easier/", recursive = T, pattern = "cell_fraction", full.names = T)
+all.pathway <- list.files(all_easier_dir, recursive = TRUE, pattern = "pathway_activities", full.names = TRUE) |>
+    validate_pan_cancer_files("Pathway activity")
+all.tf_activity <- list.files(all_easier_dir, recursive = TRUE, pattern = "tf_activities", full.names = TRUE) |>
+    validate_pan_cancer_files("TF activity")
+all.LR_weight <- list.files(all_easier_dir, recursive = TRUE, pattern = "lrpair_weights", full.names = TRUE) |>
+    validate_pan_cancer_files("Ligand-receptor")
+all.cell_fraction <- list.files(all_easier_dir, recursive = TRUE, pattern = "cell_fraction", full.names = TRUE) |>
+    validate_pan_cancer_files("Cell fraction")
 
 used_pathway <- c("Hypoxia", "JAK-STAT", "MAPK", "NFkB", "p53", "PI3K", "TGFb", "TNFa", "Trail", "VEGF", "WNT")
 used_tf <- c("STAT4", "IRF1", "STAT1", "RELB", "STAT5B", "RUNX3", "WT1", "STAT2", "RFX5", "TP63")
@@ -754,11 +785,19 @@ library(effsize)
 
 all.score.list <- list()
 
+file_for_cancer <- function(paths, cancer_type) {
+    matched <- paths[basename(dirname(paths)) == cancer_type]
+    if (length(matched) != 1L) {
+        stop("Expected one file for ", cancer_type, "; found ", length(matched))
+    }
+    matched
+}
+
 for (i in seq(all.pathway)) {
-    cancer_type <- all.cancer[i]
+    cancer_type <- basename(dirname(all.pathway[i]))
 
     ### calculate easier score
-    easier_score <- read.table(all.score[i], header = T, sep = "\t")
+    easier_score <- read.table(file_for_cancer(all.score, cancer_type), header = T, sep = "\t")
     easier_score$group <- factor(easier_score$group, levels = c("XAF1_high", "XAF1_low"))
     cohen.d.value <- cohen.d(easier_scores ~ group, data = easier_score)
     cliff.delta.value <- cliff.delta(easier_scores ~ group, data = easier_score)
@@ -771,7 +810,7 @@ for (i in seq(all.pathway)) {
 
     ### group
 
-    file_path <- paste("~/biosoft/GDC_TCGA_20250630_STAR_count/", cancer_type, sep = "")
+    file_path <- file.path(gdc_root, cancer_type)
     all_file <- list.files(file_path, full.names = T)
     tpm_file <- all_file[grep("Symbol_tpm.tsv", all_file)]
     RNA_tpm <- read_table(tpm_file, col_names = T)
@@ -797,7 +836,7 @@ for (i in seq(all.pathway)) {
         all.score.list <- append(all.score.list, list(c(cohen.d.value$estimate, cliff.delta.value$estimate, wilcox.p$p.value, j, "Pathway activity", cancer_type)))
     }
 
-    tf_activities <- read.table(all.tf_activity[i], header = T, sep = "\t", check.names = F)
+    tf_activities <- read.table(file_for_cancer(all.tf_activity, cancer_type), header = T, sep = "\t", check.names = F)
 
     XAF1_factor <- ifelse(RNA_tpm["XAF1", tf_activities$patient] > median(as.numeric(as.character(RNA_tpm["XAF1", ]))), "XAF1_high", "XAF1_low")
     tf_activities$group <- as.character(XAF1_factor)
@@ -813,7 +852,7 @@ for (i in seq(all.pathway)) {
         all.score.list <- append(all.score.list, list(c(cohen.d.value$estimate, cliff.delta.value$estimate, wilcox.p$p.value, j, "TF activity", cancer_type)))
     }
 
-    lrpair_weights <- read.table(all.LR_weight[i], header = T, sep = "\t", check.names = F)
+    lrpair_weights <- read.table(file_for_cancer(all.LR_weight, cancer_type), header = T, sep = "\t", check.names = F)
 
     XAF1_factor <- ifelse(RNA_tpm["XAF1", lrpair_weights$patient] > median(as.numeric(as.character(RNA_tpm["XAF1", ]))), "XAF1_high", "XAF1_low")
     lrpair_weights$group <- as.character(XAF1_factor)
@@ -829,7 +868,7 @@ for (i in seq(all.pathway)) {
         all.score.list <- append(all.score.list, list(c(cohen.d.value$estimate, cliff.delta.value$estimate, wilcox.p$p.value, j, "L-R expression", cancer_type)))
     }
 
-    cell_fractions <- read.table(all.cell_fraction[i], header = T, sep = "\t", check.names = F)
+    cell_fractions <- read.table(file_for_cancer(all.cell_fraction, cancer_type), header = T, sep = "\t", check.names = F)
 
     XAF1_factor <- ifelse(RNA_tpm["XAF1", cell_fractions$patient] > median(as.numeric(as.character(RNA_tpm["XAF1", ]))), "XAF1_high", "XAF1_low")
     cell_fractions$group <- as.character(XAF1_factor)
@@ -944,7 +983,7 @@ p1
 p_combine <- p1 + p + plot_layout(guides = "collect")
 p_combine
 
-setwd("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier/")
+setwd(output_dir)
 
 pdf("5.all easier detector.pdf", height = 12, width = 12)
 print(p_combine)
