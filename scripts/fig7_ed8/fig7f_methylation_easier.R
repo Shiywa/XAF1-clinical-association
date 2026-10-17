@@ -28,7 +28,7 @@ pan_cancer_set <- c(
     "BLCA", "BRCA", "CESC", "GBM", "HNSC", "KIRC", "KIRP", "LIHC", "LUAD",
     "LUSC", "PAAD", "PRAD", "SKCM", "STAD", "THCA", "UCEC", "COAD", "READ", "ESCA"
 )
-stopifnot(length(pan_cancer_set) == 19L, !"OV" %in% pan_cancer_set)
+stopifnot(length(pan_cancer_set) == 19L, length(unique(pan_cancer_set)) == 19L)
 
 # 你的注释表（已筛选出 XAF1 相关 probes，且包含 Name 列）
 # 假设 anno_use 已存在于环境。如果没有，请先生成：
@@ -459,8 +459,7 @@ for (i in unique(surv_df_best$probe)) {
 }
 
 
-corr_df_best <- corr_df_clean |>
-    filter(cancer != "OV")
+corr_df_best <- corr_df_clean
 
 plot_Rho_volcano <- function(df) {
     library(ggplot2)
@@ -974,7 +973,7 @@ rmtlr_test <- function(x_test,
     return(fit_pred)
 }
 
-cancer_use <- pan_cancer_set # Fig. 7f methylation panel: 19 cancers; OV is intentionally excluded.
+cancer_use <- pan_cancer_set # Fig. 7f methylation panel: predefined 19-cancer collection.
 
 easier_res <- list()
 
