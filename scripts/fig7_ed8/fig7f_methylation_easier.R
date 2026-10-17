@@ -1,3 +1,14 @@
+#!/usr/bin/env Rscript
+
+# Fig. 7f: pan-cancer XAF1 methylation, expression and EaSIeR associations.
+# Run from the repository root. External data and model locations are supplied
+# through config/environment.example rather than embedded workstation paths.
+
+source(file.path(
+    Sys.getenv("XAF1_PROJECT_ROOT", unset = getwd()),
+    "scripts", "common", "config.R"
+))
+
 library(readr)
 library(dplyr)
 library(patchwork)
@@ -8,8 +19,10 @@ library(minfi)
 
 library(survival)
 
-# --- 参数（根据你的路径调整）
-base_dir <- "/home/bio/biosoft/GDC_TCGA_20250630_STAR_count"
+# --- Input and output locations
+base_dir <- xaf1_env_path("XAF1_GDC_ROOT", must_exist = TRUE)
+easier_root <- xaf1_env_path("XAF1_EASIER_ROOT", must_exist = TRUE)
+result.path <- xaf1_output_dir("fig7_ed8", "methylation")
 
 # 你的注释表（已筛选出 XAF1 相关 probes，且包含 Name 列）
 # 假设 anno_use 已存在于环境。如果没有，请先生成：
@@ -417,7 +430,7 @@ for (i in unique(surv_df_best$probe)) {
         filter(probe == i) |>
         as.data.frame()
 
-    pdf(paste("TCGA mythelation450 XAF1", i, "survival valcano.pdf", sep = " "), height = 7, width = 7)
+    pdf(file.path(result.path, paste("TCGA mythelation450 XAF1", i, "survival valcano.pdf", sep = " ")), height = 7, width = 7)
     p1 <- plot_HR_volcano(d1) +
         plot_layout(guides = "collect") +
         plot_annotation(
@@ -557,7 +570,7 @@ for (i in unique(corr_df_best$probe)) {
         filter(probe == i) |>
         as.data.frame()
 
-    pdf(paste("TCGA mythelation450 correlation of XAF1 and", i, ".pdf", sep = " "), height = 7, width = 7)
+    pdf(file.path(result.path, paste("TCGA mythelation450 correlation of XAF1 and", i, ".pdf", sep = " ")), height = 7, width = 7)
     p1 <- plot_Rho_volcano(d1) +
         plot_layout(guides = "collect") +
         plot_annotation(
@@ -730,7 +743,7 @@ surv_df_XAF1_best <- surv_df_XAF1_clean %>%
 write_tsv(surv_df_XAF1_best, file.path(result.path, "XAF1_gene_survival_results.tsv"))
 
 
-pdf(paste("TCGA XAF1 survival valcano.pdf", sep = " "), height = 7, width = 7)
+pdf(file.path(result.path, "TCGA XAF1 survival valcano.pdf"), height = 7, width = 7)
 p1 <- plot_HR_volcano(surv_df_XAF1_best) +
     plot_layout(guides = "collect") +
     plot_annotation(
@@ -782,8 +795,8 @@ predict_immune_response2 <- function(pathways = NULL, immunecells = NULL, tfs = 
         return(tmp)
     })
     view_combinations <- view_simples
-    opt_models <- readRDS("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier/opt_models.rds")
-    opt_xtrain_stats <- readRDS("/home/Toshiba1/Lab_Ma/yuanyi/immunity_analysis/easier/opt_xtrain_stats.rds")
+    opt_models <- readRDS(file.path(easier_root, "opt_models.rds"))
+    opt_xtrain_stats <- readRDS(file.path(easier_root, "opt_xtrain_stats.rds"))
     compute_prediction <- function(view, verbose, opt_models,
                                    opt_xtrain_stats, cancer_type) {
         view_info <- view_combinations[[view]]
@@ -952,8 +965,8 @@ rmtlr_test <- function(x_test,
 
 cancer_use <- c(
     "BLCA", "BRCA", "CESC", "GBM", "HNSC", "KIRC", "KIRP", "LIHC", "LUAD",
-    "LUSC", "OV", "PAAD", "PRAD", "SKCM", "STAD", "THCA", "UCEC", "COAD", "READ", "ESCA"
-) # ,
+    "LUSC", "PAAD", "PRAD", "SKCM", "STAD", "THCA", "UCEC", "COAD", "READ", "ESCA"
+) # Fig. 7f methylation panel: 19 cancers; OV is intentionally excluded.
 
 easier_res <- list()
 
@@ -1238,7 +1251,7 @@ all.score.df2 <- all.score.df %>%
     filter(!probe %in% filter_probe)
 
 
-rho_tb <- read_delim("/home/Toshiba1/Lab_Ma/yuanyi/XAF1-clinical-association/results/methylation/XAF1_probe_expression_correlation.tsv", delim = "\t", col_names = TRUE, show_col_types = FALSE)
+rho_tb <- read_delim(file.path(result.path, "XAF1_probe_expression_correlation.tsv"), delim = "\t", col_names = TRUE, show_col_types = FALSE)
 rho_tb[1:5, 1:18]
 
 all.score.df2 <- all.score.df2 %>%
@@ -1286,7 +1299,7 @@ p <- ggplot() +
 
 print(p)
 
-pdf("/home/Toshiba1/Lab_Ma/yuanyi/XAF1-clinical-association/results/methylation/easier/1.all XAF1 methylation probe easier score.pdf", height = 6, width = 10)
+pdf(file.path(result.path, "Fig7f_XAF1_methylation_EaSIeR_score.pdf"), height = 6, width = 10)
 print(p)
 dev.off()
 
@@ -1454,6 +1467,6 @@ p <- ggplot() +
 
 print(p)
 
-pdf("/home/Toshiba1/Lab_Ma/yuanyi/XAF1-clinical-association/results/methylation/easier/2.all XAF1 methylation probe easier score and expression correlation.pdf", height = 7, width = 15)
+pdf(file.path(result.path, "Fig7f_XAF1_methylation_EaSIeR_expression.pdf"), height = 7, width = 15)
 print(p)
 dev.off()

@@ -1,0 +1,37 @@
+# Repository root; scripts use the current working directory if unset.
+XAF1_PROJECT_ROOT=/path/to/XAF1-clinical-association
+
+# Panel input data.
+XAF1_CCLE_DATA_DIR=/path/to/CCLE
+XAF1_DISEASE_SCORE_FILE=/path/to/disease_score.xlsx
+XAF1_VIRAL_DATA_DIR=/path/to/viral_bulk
+XAF1_GSE271284_RDS=/path/to/230217_recast_after_qc.rds
+
+# TCGA and EaSIeR resources used by Fig. 7 and Extended Data Fig. 8.
+XAF1_REFERENCE_ROOT=/path/to/reference
+XAF1_GDC_ROOT=/path/to/GDC_TCGA_STAR_count
+XAF1_EASIER_ROOT=/path/to/easier
+XAF1_KEGG_CLASS_FILE=/path/to/KEGG_pathway_Class.txt
+
+# Optional Python/conda settings used by Seurat integrations.
+XAF1_RETICULATE_PYTHON=/path/to/python
+XAF1_CONDA_BINARY=/path/to/conda
+XAF1_THREADS=8
+
+# Fig. 2b eCLIP inputs. Raw reads and processed tracks are not versioned.
+XAF1_ECLIP_RAW_DIR=/path/to/eclip/raw
+XAF1_ECLIP_WORK_DIR=/path/to/eclip/work
+XAF1_STAR_INDEX=/path/to/GRCh38_STAR_index
+XAF1_RRNA_STAR_INDEX=/path/to/rRNA_STAR_index
+XAF1_CHROM_SIZES=/path/to/hg38.chrom.sizes
+XAF1_ECLIP_BIGWIG_DIR=/path/to/eclip/bigwig
+XAF1_ECLIP_PEAK_DIR=/path/to/eclip/peaks
+XAF1_STING1_GTF=/path/to/STING1_exons.gtf
+XAF1_ECLIP_REPLICATE=rep2
+
+# Fig. 2h tools.
+XAF1_DATASETS_BIN=/path/to/datasets
+XAF1_MAFFT_BIN=/path/to/mafft
+XAF1_IUPRED_SOURCE=/path/to/iupred/source
+XAF1_PYTHON_BIN=/path/to/python3
+XAF1_RSCRIPT_BIN=/path/to/Rscript

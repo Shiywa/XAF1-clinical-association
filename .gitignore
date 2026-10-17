@@ -1,0 +1,31 @@
+# Local inputs and generated outputs
+data/
+results/
+output/
+outputs/
+work/
+
+# Large sequencing and R objects
+*.bam
+*.bai
+*.bedgraph
+*.bigWig
+*.bw
+*.fastq
+*.fastq.gz
+*.rds
+*.RData
+
+# Local environments and caches
+config/environment
+.Renviron
+.Rhistory
+.Rproj.user/
+renv/library/
+__pycache__/
+*.py[cod]
+.snakemake/
+
+# Operating-system/editor files
+.DS_Store
+*~
