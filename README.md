@@ -68,9 +68,9 @@ The complete input/output map is in
   and projects them to human XAF1 coordinates. The current analysis retained
   220 non-human mammalian orthologues; the count is written from the run data
   and may change when NCBI records are updated.
-- Fig. 7f uses 19 cancer types after excluding OV for the methylation display.
-  Fig. 7e and ED Fig. 8c use the 20-cancer expression/EaSIeR collection,
-  including OV. The two scopes are intentionally recorded separately.
+- All pan-cancer analyses use the same 19 cancer types. OV is excluded from
+  Fig. 7e-f and ED Fig. 8c, including both methylation and expression/EaSIeR
+  calculations.
 - ED Fig. 7k displays cell-level distributions but exports donor-level summary
   values and Wilcoxon tests so cells from one donor are not counted as
   independent biological replicates.

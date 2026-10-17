@@ -24,6 +24,12 @@ base_dir <- xaf1_env_path("XAF1_GDC_ROOT", must_exist = TRUE)
 easier_root <- xaf1_env_path("XAF1_EASIER_ROOT", must_exist = TRUE)
 result.path <- xaf1_output_dir("fig7_ed8", "methylation")
 
+pan_cancer_set <- c(
+    "BLCA", "BRCA", "CESC", "GBM", "HNSC", "KIRC", "KIRP", "LIHC", "LUAD",
+    "LUSC", "PAAD", "PRAD", "SKCM", "STAD", "THCA", "UCEC", "COAD", "READ", "ESCA"
+)
+stopifnot(length(pan_cancer_set) == 19L, !"OV" %in% pan_cancer_set)
+
 # 你的注释表（已筛选出 XAF1 相关 probes，且包含 Name 列）
 # 假设 anno_use 已存在于环境。如果没有，请先生成：
 # anno_use <- anno[,c("chr","pos","strand","Name", ... )] |> as.data.frame() |> filter(grepl("XAF1", UCSC_RefGene_Name))
@@ -63,8 +69,13 @@ clin_df <- data.frame(path = clinical.file, cancer = sapply(clinical.file, get_c
 count_df <- data.frame(path = count.file, cancer = sapply(count.file, get_cancer_name), stringsAsFactors = FALSE)
 
 # 找到三者都存在的癌种
-common_cancers <- intersect(intersect(methy_df$cancer, tpm_df$cancer), clin_df$cancer)
+common_cancers <- Reduce(intersect, list(methy_df$cancer, tpm_df$cancer, clin_df$cancer, count_df$cancer))
 if (length(common_cancers) == 0) stop("没有找到同时包含 methylation/tpm/clinical 的相同癌种文件，请检查文件名与路径。")
+missing_cancers <- setdiff(pan_cancer_set, common_cancers)
+if (length(missing_cancers)) {
+    stop("Missing methylation/expression/clinical inputs for: ", paste(missing_cancers, collapse = ", "))
+}
+common_cancers <- pan_cancer_set
 
 
 # 获取甲基化芯片注释信息
@@ -769,7 +780,7 @@ predict_immune_response2 <- function(pathways = NULL, immunecells = NULL, tfs = 
     available_cancer_types <- c(
         "BLCA", "BRCA", "CESC", "CRC",
         "GBM", "HNSC", "KIRC", "KIRP", "LIHC", "LUAD", "LUSC",
-        "NSCLC", "OV", "PAAD", "PRAD", "SKCM", "STAD", "THCA",
+        "NSCLC", "PAAD", "PRAD", "SKCM", "STAD", "THCA",
         "UCEC"
     )
     if (!cancer_type %in% available_cancer_types) {
@@ -963,10 +974,7 @@ rmtlr_test <- function(x_test,
     return(fit_pred)
 }
 
-cancer_use <- c(
-    "BLCA", "BRCA", "CESC", "GBM", "HNSC", "KIRC", "KIRP", "LIHC", "LUAD",
-    "LUSC", "PAAD", "PRAD", "SKCM", "STAD", "THCA", "UCEC", "COAD", "READ", "ESCA"
-) # Fig. 7f methylation panel: 19 cancers; OV is intentionally excluded.
+cancer_use <- pan_cancer_set # Fig. 7f methylation panel: 19 cancers; OV is intentionally excluded.
 
 easier_res <- list()
 

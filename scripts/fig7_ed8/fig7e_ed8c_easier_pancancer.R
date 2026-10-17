@@ -17,6 +17,12 @@ all_easier_dir <- file.path(output_dir, "per_cancer")
 dir.create(all_easier_dir, recursive = TRUE, showWarnings = FALSE)
 setwd(output_dir)
 
+pan_cancer_set <- c(
+    "BLCA", "BRCA", "CESC", "GBM", "HNSC", "KIRC", "KIRP", "LIHC", "LUAD",
+    "LUSC", "PAAD", "PRAD", "SKCM", "STAD", "THCA", "UCEC", "COAD", "READ", "ESCA"
+)
+stopifnot(length(pan_cancer_set) == 19L, !"OV" %in% pan_cancer_set)
+
 # 3. 预测 ICB 响应可能性
 predict_immune_response2 <- function(pathways = NULL, immunecells = NULL, tfs = NULL, lrpairs = NULL,
                                      ccpairs = NULL, cancer_type, verbose = TRUE) {
@@ -26,7 +32,7 @@ predict_immune_response2 <- function(pathways = NULL, immunecells = NULL, tfs = 
     available_cancer_types <- c(
         "BLCA", "BRCA", "CESC", "CRC",
         "GBM", "HNSC", "KIRC", "KIRP", "LIHC", "LUAD", "LUSC",
-        "NSCLC", "OV", "PAAD", "PRAD", "SKCM", "STAD", "THCA",
+        "NSCLC", "PAAD", "PRAD", "SKCM", "STAD", "THCA",
         "UCEC"
     )
     if (!cancer_type %in% available_cancer_types) {
@@ -224,7 +230,7 @@ rmtlr_test <- function(x_test,
 setwd(all_easier_dir)
 library(tibble)
 
-cancer_use <- c("BLCA", "BRCA", "CESC", "GBM", "HNSC", "KIRC", "KIRP", "LIHC", "LUAD", "LUSC", "OV", "PAAD", "PRAD", "SKCM", "STAD", "THCA", "UCEC")
+cancer_use <- setdiff(pan_cancer_set, c("COAD", "READ", "ESCA"))
 
 for (i in c("COAD", "READ")) {
     setwd(all_easier_dir)
@@ -538,7 +544,7 @@ for (i in cancer_use) {
 
 ##### add ESCA 等肿瘤类型 #####
 
-cancer_use <- c("ESCA")
+cancer_use <- intersect("ESCA", pan_cancer_set)
 
 for (i in cancer_use) {
     setwd(all_easier_dir)
@@ -699,7 +705,21 @@ library(rstatix)
 library(ggpubr)
 setwd(output_dir)
 
-all.score <- list.files(all_easier_dir, recursive = TRUE, pattern = "easier_score", full.names = TRUE)
+keep_pan_cancer_files <- function(paths) {
+    paths[basename(dirname(paths)) %in% pan_cancer_set]
+}
+
+validate_pan_cancer_files <- function(paths, label) {
+    paths <- keep_pan_cancer_files(paths)
+    cancers <- basename(dirname(paths))
+    if (length(paths) != 19L || !setequal(cancers, pan_cancer_set)) {
+        stop(label, " files do not match the required 19-cancer set.")
+    }
+    paths
+}
+
+all.score <- list.files(all_easier_dir, recursive = TRUE, pattern = "easier_score", full.names = TRUE) |>
+    validate_pan_cancer_files("EaSIeR score")
 
 score.list <- list()
 for (i in seq(all.score)) {
@@ -747,10 +767,14 @@ pdf("4.all easier.pdf", height = 8, width = 12)
 print(p1)
 dev.off()
 
-all.pathway <- list.files(all_easier_dir, recursive = TRUE, pattern = "pathway_activities", full.names = TRUE)
-all.tf_activity <- list.files(all_easier_dir, recursive = TRUE, pattern = "tf_activities", full.names = TRUE)
-all.LR_weight <- list.files(all_easier_dir, recursive = TRUE, pattern = "lrpair_weights", full.names = TRUE)
-all.cell_fraction <- list.files(all_easier_dir, recursive = TRUE, pattern = "cell_fraction", full.names = TRUE)
+all.pathway <- list.files(all_easier_dir, recursive = TRUE, pattern = "pathway_activities", full.names = TRUE) |>
+    validate_pan_cancer_files("Pathway activity")
+all.tf_activity <- list.files(all_easier_dir, recursive = TRUE, pattern = "tf_activities", full.names = TRUE) |>
+    validate_pan_cancer_files("TF activity")
+all.LR_weight <- list.files(all_easier_dir, recursive = TRUE, pattern = "lrpair_weights", full.names = TRUE) |>
+    validate_pan_cancer_files("Ligand-receptor")
+all.cell_fraction <- list.files(all_easier_dir, recursive = TRUE, pattern = "cell_fraction", full.names = TRUE) |>
+    validate_pan_cancer_files("Cell fraction")
 
 used_pathway <- c("Hypoxia", "JAK-STAT", "MAPK", "NFkB", "p53", "PI3K", "TGFb", "TNFa", "Trail", "VEGF", "WNT")
 used_tf <- c("STAT4", "IRF1", "STAT1", "RELB", "STAT5B", "RUNX3", "WT1", "STAT2", "RFX5", "TP63")
